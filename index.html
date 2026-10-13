@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://resizing.flixster.com https://*.flixster.com https://*.rottentomatoes.com https://*.mzstatic.com https://image.tmdb.org https://images.fandango.com; connect-src 'self' https://api.zippopotam.us https://nominatim.openstreetmap.org https://itunes.apple.com https://api.themoviedb.org; frame-src 'none'; object-src 'none'; base-uri 'self';"
+  />
+  <title>ReelWindow — Theatrical Release &amp; Leaving-Soon Tracker</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- Top Header -->
+  <header class="app-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">🎬</div>
+        <div>
+          <h1 class="brand-title">ReelWindow</h1>
+          <p class="brand-subtitle">Never Miss a Movie in Theaters Again • GitHub Pages Ready</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div id="activeZipBadge" class="active-zip-pill hidden">
+          <span class="zip-dot"></span>
+          <span id="activeZipText">ZIP: All US</span>
+          <button id="clearZipHeaderBtn" class="pill-clear-btn" title="Clear ZIP filter">×</button>
+        </div>
+        <button id="openSettingsBtn" class="btn btn-ghost" title="Optional TMDB API Key Settings">
+          ⚙️ Data Source
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Search & ZIP Control Bar -->
+  <section class="search-hero">
+    <div class="container">
+      <div class="search-panel">
+        <form id="searchForm" class="search-grid" novalidate>
+          <!-- Movie Search -->
+          <div class="input-group movie-search-group">
+            <label for="movieSearchInput" class="input-label">Search New &amp; Upcoming Movies</label>
+            <div class="input-wrapper">
+              <span class="input-icon">🔍</span>
+              <input
+                type="text"
+                id="movieSearchInput"
+                placeholder="Search by movie title, genre, or keyword (e.g. Practical Magic, Sci-Fi)..."
+                autocomplete="off"
+              />
+              <button type="button" id="clearSearchBtn" class="input-clear-btn hidden" title="Clear search">×</button>
+            </div>
+          </div>
+
+          <!-- ZIP Code Lookup -->
+          <div class="input-group zip-search-group">
+            <label for="zipCodeInput" class="input-label">Pull Up by ZIP Code</label>
+            <div class="input-wrapper">
+              <span class="input-icon">📍</span>
+              <input
+                type="text"
+                id="zipCodeInput"
+                placeholder="Enter 5-digit ZIP (e.g. 90210)"
+                maxlength="5"
+                inputmode="numeric"
+                pattern="[0-9]{5}"
+              />
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="input-group submit-group">
+            <label class="input-label invisible-label">Update</label>
+            <button type="submit" id="applySearchBtn" class="btn btn-primary btn-full">
+              Update Theatrical List
+            </button>
+          </div>
+        </form>
+
+        <!-- Quick Sample ZIPs & Window Legend -->
+        <div class="quick-bar">
+          <div class="quick-zips">
+            <span class="quick-label">Try ZIP Code:</span>
+            <button type="button" class="chip-btn zip-preset" data-zip="90210">90210 (Beverly Hills)</button>
+            <button type="button" class="chip-btn zip-preset" data-zip="10001">10001 (New York)</button>
+            <button type="button" class="chip-btn zip-preset" data-zip="78701">78701 (Austin)</button>
+            <button type="button" class="chip-btn zip-preset" data-zip="60601">60601 (Chicago)</button>
+            <button type="button" class="chip-btn zip-preset" data-zip="98101">98101 (Seattle)</button>
+          </div>
+
+          <div class="legend-pills">
+            <span class="legend-item"><span class="dot dot-last-chance"></span> Last Chance (&le;7d left)</span>
+            <span class="legend-item"><span class="dot dot-leaving-soon"></span> Leaving Soon (8–14d left)</span>
+            <span class="legend-item"><span class="dot dot-now-playing"></span> Now Playing</span>
+            <span class="legend-item"><span class="dot dot-coming-soon"></span> Coming Soon</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content Container -->
+  <main class="container main-content">
+    <!-- Error Alert Banner -->
+    <div id="errorBanner" class="error-banner hidden" role="alert">
+      <span id="errorBannerText"></span>
+      <button type="button" id="closeErrorBtn" class="error-close-btn">×</button>
+    </div>
+
+    <!-- Summary Stats Bar -->
+    <section class="stats-strip" id="statsStrip">
+      <div class="stat-card stat-urgent" data-filter-target="urgent">
+        <div class="stat-value" id="statUrgentCount">0</div>
+        <div class="stat-meta">
+          <span class="stat-title">Leaving Soon / Last Chance</span>
+          <span class="stat-desc">Ending within 14 days — catch them now!</span>
+        </div>
+      </div>
+      <div class="stat-card" data-filter-target="now_playing">
+        <div class="stat-value" id="statNowPlayingCount">0</div>
+        <div class="stat-meta">
+          <span class="stat-title">Now Playing in Theaters</span>
+          <span class="stat-desc">Currently on view in cinemas</span>
+        </div>
+      </div>
+      <div class="stat-card" data-filter-target="coming_soon">
+        <div class="stat-value" id="statComingSoonCount">0</div>
+        <div class="stat-meta">
+          <span class="stat-title">Coming Soon</span>
+          <span class="stat-desc">Upcoming theatrical releases</span>
+        </div>
+      </div>
+      <div class="stat-card" data-filter-target="watchlist">
+        <div class="stat-value" id="statWatchlistCount">0</div>
+        <div class="stat-meta">
+          <span class="stat-title">My "Don't Miss" List</span>
+          <span class="stat-desc">Saved movies to catch in theaters</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Nearby Theaters Section (Appears when ZIP Code is active) -->
+    <section id="zipTheatersSection" class="theaters-section hidden">
+      <div class="theaters-header">
+        <div>
+          <div class="theaters-eyebrow">LOCAL CINEMA DIRECTORY &amp; MARKET WINDOW</div>
+          <h2 id="zipLocationHeading" class="theaters-title">Theaters near ZIP</h2>
+          <p id="zipMarketNote" class="theaters-subtitle"></p>
+        </div>
+        <div class="theaters-header-links">
+          <a id="googleAllZipLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+            🎟️ Local Showtimes on Google ↗
+          </a>
+          <a id="mapsAllZipLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+            🗺️ View Theaters on Map ↗
+          </a>
+          <button type="button" id="toggleTheatersBtn" class="btn btn-ghost">
+            Hide Theaters
+          </button>
+        </div>
+      </div>
+
+      <div id="theatersGrid" class="theaters-grid"></div>
+    </section>
+
+    <!-- Filter Tabs, Sort & View Mode Controls -->
+    <section class="controls-bar">
+      <div class="filter-tabs" role="tablist">
+        <button type="button" class="tab-btn active" data-filter="all">
+          All Theatrical <span class="tab-count" id="countAll">0</span>
+        </button>
+        <button type="button" class="tab-btn tab-urgent" data-filter="urgent">
+          🚨 Leaving Soon / Last Chance <span class="tab-count" id="countUrgent">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-filter="now_playing">
+          🎟️ Now Playing <span class="tab-count" id="countNow">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-filter="coming_soon">
+          📅 Coming Soon <span class="tab-count" id="countComing">0</span>
+        </button>
+        <button type="button" class="tab-btn" data-filter="watchlist">
+          ⭐ Don't Miss List <span class="tab-count" id="countWatchlist">0</span>
+        </button>
+      </div>
+
+      <div class="right-controls">
+        <div class="sort-control">
+          <label for="minRatingSelect" class="control-label">Min Rating:</label>
+          <select id="minRatingSelect" class="select-input">
+            <option value="0">Any Rating</option>
+            <option value="6.0">6.0+ / 10 (60%+)</option>
+            <option value="7.0">7.0+ / 10 (70%+)</option>
+            <option value="7.5">7.5+ / 10 (75%+)</option>
+            <option value="8.0">8.0+ / 10 (80%+)</option>
+          </select>
+        </div>
+
+        <div class="sort-control">
+          <label for="sortSelect" class="control-label">Sort By:</label>
+          <select id="sortSelect" class="select-input">
+            <option value="urgency">🚨 Leaving Soonest (Don't Miss)</option>
+            <option value="rating_desc">⭐ Highest Review Rating</option>
+            <option value="start_desc">🆕 Newest Start Date</option>
+            <option value="start_asc">📅 Earliest Start Date</option>
+            <option value="end_asc">⏳ Earliest End Date</option>
+            <option value="title_asc">🔤 Title (A–Z)</option>
+          </select>
+        </div>
+
+        <div class="view-toggle" role="group" aria-label="View layout">
+          <button type="button" id="viewCardsBtn" class="view-btn active" title="Card Grid View">
+            ⊞ Cards
+          </button>
+          <button type="button" id="viewTableBtn" class="view-btn" title="Schedule Table View">
+            ☰ Table
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Loading Indicator -->
+    <div id="loadingState" class="loading-state hidden">
+      <div class="spinner"></div>
+      <p id="loadingText">Loading theatrical releases, review scores, and estimated theater windows...</p>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="empty-state hidden">
+      <div class="empty-icon">🎞️</div>
+      <h3 id="emptyTitle">No matching movies found</h3>
+      <p id="emptySubtitle">Try clearing a filter or searching for another movie title.</p>
+      <button type="button" id="resetFiltersBtn" class="btn btn-secondary">Reset All Filters</button>
+    </div>
+
+    <!-- Movies Card Grid View -->
+    <section id="moviesCardGrid" class="movies-grid"></section>
+
+    <!-- Movies Schedule Table View -->
+    <section id="moviesTableContainer" class="table-container hidden">
+      <table class="schedule-table">
+        <thead>
+          <tr>
+            <th>Movie Title</th>
+            <th>Theatrical Status</th>
+            <th>Avg Review Rating</th>
+            <th>Est. Start Date</th>
+            <th>Est. End Date</th>
+            <th>Theatrical Run Window</th>
+            <th>Actions / Showtimes</th>
+          </tr>
+        </thead>
+        <tbody id="moviesTableBody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- Optional TMDB API Key Modal -->
+  <div id="settingsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">Data Source &amp; Optional TMDB API Key</h3>
+        <button type="button" id="closeSettingsBtn" class="modal-close-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-note">
+          <strong>100% Static &amp; GitHub Pages Ready:</strong> ReelWindow runs entirely in your browser using the bundled 230+ movie dataset (<code>movies-data.json</code>) plus live browser CORS APIs for ZIP code lookup, OpenStreetMap cinema locations, and Apple iTunes movie search—no Node server required!
+        </p>
+        <p class="modal-note">
+          If you also have a <strong>TMDB API Key</strong> (v3 key or v4 Read Access Token), you can enter it below to merge TMDB's live <em>Now Playing</em> and <em>Upcoming</em> feeds directly in your browser.
+        </p>
+        <label for="tmdbKeyInput" class="input-label">Optional TMDB API Key / Read Token</label>
+        <input
+          type="password"
+          id="tmdbKeyInput"
+          class="modal-input"
+          placeholder="Paste optional TMDB API key..."
+          autocomplete="off"
+        />
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="clearTmdbKeyBtn" class="btn btn-ghost">Use Default (No Key)</button>
+        <button type="button" id="saveTmdbKeyBtn" class="btn btn-primary">Save &amp; Refresh</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <div class="container footer-inner">
+      <p>
+        <strong>How Theatrical Windows Are Estimated:</strong> Start dates reflect official theatrical openings. Estimated end dates combine studio release scale (Blockbuster ~60d, Wide ~45d, Mid-Wide ~35d, Limited/Indie ~24d), review rating word-of-mouth hold (&pm;7 to 14 days), and local ZIP code cinema density. Strict CSP enabled (no third-party ad trackers).
+      </p>
+    </div>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
